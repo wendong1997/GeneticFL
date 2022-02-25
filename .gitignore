@@ -1,4 +1,9 @@
+/data/result/
+
+# idea
 /.idea/
 __pycache__/
 .ipynb_checkpoints
+
+# macOS
 .DS_Store
