@@ -156,4 +156,5 @@ def main():
         pickle.dump(generations_test_data, f)\
 
 
-
+if __name__ == '__main__':
+    main()
