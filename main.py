@@ -93,9 +93,10 @@ if __name__ == '__main__':
         # 联邦聚合，聚合后测试
         avg_model = getAverageModel(models)
         avg_loss, avg_acc = test(avg_model, DEVICE, test_loader, 'avg')
-        test_loss_center['avg'].append(avg_loss)
+        # test_loss_center['avg'].append(avg_loss)
         test_acc_center['avg'].append(avg_acc)
 
+        """
         # 遗传算法优化
         print('\n>>> GMA start ...')
         gma = GeneticMergeAlg(models)
@@ -112,19 +113,31 @@ if __name__ == '__main__':
                 test_loss_center['gma'].append(gma_loss)
                 test_acc_center['gma'].append(gma_acc)
         generations_test_data[epoch] = generations
-        # gma_res = []
-        # gma_idx = 0
-        # gma_loss, gma_acc = 1, 0
-        # for j in range(len(gma.P)):
-        #     gma_res.append(po.apply_async(test, args=(gma.P[j], DEVICE, test_loader, j)))
-        # for j in range(len(gma_res)):
-        #     tmp_loss, tmp_acc = gma_res[j].get()
-        #     if tmp_acc > gma_acc:
-        #         gma_acc = tmp_acc
-        #         gma_loss = tmp_loss
-        #         gma_idx = j
+        """
 
-        # models = [deepcopy(gma.P[gma_idx]) for _ in range(CLIENT_NUM)] # 再训练后不改变models中模型的参数，因为优化器不针对新的模型
+        # 遗传算法优化
+        print('\n>>> GMA start ...')
+        gma = GeneticMergeAlg(models, DEVICE, test_loader)
+        generations_acc = [] # 存储每一代中最优个体的acc
+        for i in range(GENERATIONS):
+            print('\nGMA generation %d start \n' % i)
+            gma.mutationInLayer(0.5)
+            gma.crossover(0.8)
+            fitness = gma.getFitness(po)
+
+            # 最后一代的最优个体作为当前epoch的中心节点gma聚合结果
+            if i == GENERATIONS-1:
+                gma_acc = max(fitness)
+                test_acc_center['gma'].append(gma_acc)
+                gma_model = deepcopy(gma.P[fitness.index(gma_acc)])
+                break
+
+            # best_fit = gma.tournamentSelection(3, 30)
+            best_fit = gma.rouletteSeletion(30)
+            generations_acc.append(best_fit)
+            print('\nGeneration {} best model\' acc: {}'.format(i, best_fit))
+
+        generations_test_data[epoch] = generations_acc
 
         # 将最优的模型参数赋值为models
         updataModels(models, gma_model)

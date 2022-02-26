@@ -1,3 +1,4 @@
+import pickle
 import random
 from copy import deepcopy
 from multiprocessing import Pool
@@ -14,9 +15,8 @@ random.seed(2)
 class GeneticMergeAlg(object):
     """遗传归并算法"""
 
-    def __init__(self, models):
+    def __init__(self, models, DEVICE, test_loader):
         """
-        初始化种群
         :param models:
         """
         # 1.复制现有模型到新种群
@@ -24,6 +24,9 @@ class GeneticMergeAlg(object):
         # 2.将平均模型纳入新种群
         avg_model = getAverageModel(models)
         self.P.append(avg_model)
+        self.device = DEVICE
+        self.test_loader = test_loader
+        self.fitness = []
 
     def mutationInModel(self, pm):
         """
@@ -110,6 +113,17 @@ class GeneticMergeAlg(object):
                 CP.append(model2)
         self.P.extend(CP)
 
+    def getFitness(self, pool):
+        callback = []
+        fitness = [] # [i, P[i]的test_acc]
+        for i in range(len(self.P)):
+            callback.append(pool.apply_async(test, args=(self.P[i], self.device, self.test_loader, i)))
+        for j in range(len(callback)):
+            _, tmp_acc = callback[j].get()
+            fitness.append(tmp_acc)
+        self.fitness = fitness
+        return fitness
+
     def select(self, po, device, test_loader):
         callback = []
         res = []
@@ -135,10 +149,47 @@ class GeneticMergeAlg(object):
         self.P = new_p
         return best_model, min_loss, max_acc
 
+    def rouletteSeletion(self, population_size):
+        fitness = deepcopy(self.fitness)
+
+        # 轮盘赌选择
+        new_idx = np.random.choice(range(len(self.P)), size=population_size-1, replace=True,
+                         p=[fit/sum(fitness) for fit in fitness])
+        new_p = [self.P[idx] for idx in new_idx]
+        best_idx = fitness.index(max(fitness))
+        best_individual = self.P[best_idx]
+        new_p.append(best_individual) # self.P最后一个即为最优个体
+        self.P = new_p
+        return fitness[best_idx]
+
+    def tournamentSelection(self, tournament_size, population_size):
+        fitness = deepcopy(self.fitness)
+        best_fit = 0
+
+        # 锦标赛选择
+        population = list(range(len(self.P))) # 种群个体下标
+        complete = lambda competitors: max(competitors, key=fitness.__getitem__)
+        new_p = []
+        while population and len(new_p) < population_size:
+            competitors = random.sample(population, min(tournament_size, len(population))) # 随机选取一批竞争对手
+            winner = complete(competitors)
+            best_fit = max(best_fit, fitness[winner])
+            new_p.append(self.P[winner]) # 胜者加入下一轮
+            population.remove(winner) # 将胜者从当前代中剔除: remove删除的是值，与下标顺序无关
+        self.P = new_p
+        return best_fit
+
 
 if __name__ == '__main__':
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     models = [ConvNet().to(DEVICE) for _ in range(10)]
-    gma = GeneticMergeAlg(models)
+    with open('./data/MNIST_onetenth_testloader.pkl', 'rb') as f:
+        test_loader = pickle.load(f)
+    po = Pool()
+    gma = GeneticMergeAlg(models, DEVICE, test_loader, po)
     gma.mutationInLayer(1)
     gma.crossover(0.8)
+    best_acc = gma.tournamentSelection(3, 20)
+
+    po.close()
+    po.join()
