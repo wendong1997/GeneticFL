@@ -175,7 +175,7 @@ class GeneticMergeAlg(object):
             winner = complete(competitors)
             best_fit = max(best_fit, fitness[winner])
             new_p.append(self.P[winner]) # 胜者加入下一轮
-            population.remove(winner) # 将胜者从当前代中剔除: remove删除的是值，与下标顺序无关
+            # population.remove(winner) # 将胜者从当前代中剔除: remove删除的是值，与下标顺序无关
         self.P = new_p
         return best_fit
 

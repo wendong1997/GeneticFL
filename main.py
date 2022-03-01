@@ -39,6 +39,31 @@ def updataModels(models, new_model):
     for i in range(len(models)):
         models[i].load_state_dict(deepcopy(model_param))
 
+def geneticFL(models, DEVICE, test_loader, pool, GENERATIONS, pm, pc, NP):
+    # 遗传算法优化
+    print('\n>>> GMA start ...')
+    gma = GeneticMergeAlg(models, DEVICE, test_loader)
+    gma_model = None # 遗传优化后要返回的模型
+    generations_acc = []  # 存储每一代中最优个体的acc
+    for i in range(GENERATIONS):
+        print('\nGMA generation %d start \n' % i)
+        gma.mutationInLayer(pm)
+        gma.crossover(pc)
+        fitness = gma.getFitness(pool)
+
+        # 最后一代的最优个体作为当前epoch的中心节点gma聚合结果
+        if i == GENERATIONS - 1:
+            gma_acc = max(fitness)
+            test_acc_center['gma'].append(gma_acc)
+            gma_model = deepcopy(gma.P[fitness.index(gma_acc)])
+            break
+
+        best_fit = gma.tournamentSelection(3, NP)
+        # best_fit = gma.rouletteSeletion(30)
+        generations_acc.append(best_fit)
+        print('\nGeneration {} best model\' acc: {}'.format(i, best_fit))
+    return gma_model, generations_acc
+
 
 if __name__ == '__main__':
     # 设置超参数
@@ -114,36 +139,42 @@ if __name__ == '__main__':
                 test_acc_center['gma'].append(gma_acc)
         generations_test_data[epoch] = generations
         """
+        # # 遗传算法优化
+        # print('\n>>> GMA start ...')
+        # gma = GeneticMergeAlg(models, DEVICE, test_loader)
+        # generations_acc = [] # 存储每一代中最优个体的acc
+        # for i in range(GENERATIONS):
+        #     print('\nGMA generation %d start \n' % i)
+        #     gma.mutationInLayer(0.5)
+        #     gma.crossover(0.8)
+        #     fitness = gma.getFitness(po)
+        #
+        #     # 最后一代的最优个体作为当前epoch的中心节点gma聚合结果
+        #     if i == GENERATIONS-1:
+        #         gma_acc = max(fitness)
+        #         test_acc_center['gma'].append(gma_acc)
+        #         gma_model = deepcopy(gma.P[fitness.index(gma_acc)])
+        #         break
+        #
+        #     best_fit = gma.tournamentSelection(3, 30)
+        #     # best_fit = gma.rouletteSeletion(30)
+        #     generations_acc.append(best_fit)
+        #     print('\nGeneration {} best model\' acc: {}'.format(i, best_fit))
 
-        # 遗传算法优化
-        print('\n>>> GMA start ...')
-        gma = GeneticMergeAlg(models, DEVICE, test_loader)
-        generations_acc = [] # 存储每一代中最优个体的acc
-        for i in range(GENERATIONS):
-            print('\nGMA generation %d start \n' % i)
-            gma.mutationInLayer(0.5)
-            gma.crossover(0.8)
-            fitness = gma.getFitness(po)
+        # 中心方测试精度优于参与方时进行遗传优化
+        participants_now_acc = [test_acc_all[i][-1] for i in range(CLIENT_NUM)]
+        if avg_acc >= sum(participants_now_acc) / CLIENT_NUM:
+            gma_model, generations_acc = geneticFL(models, DEVICE, test_loader, po,
+                                                   GENERATIONS=50, pm=0.5, pc=0.8, NP=30)
+            generations_test_data[epoch] = generations_acc
+            best_model = gma_model
+        else:
+            best_model = avg_model
+        updataModels(models, best_model) # 将最优的模型参数赋值为models
 
-            # 最后一代的最优个体作为当前epoch的中心节点gma聚合结果
-            if i == GENERATIONS-1:
-                gma_acc = max(fitness)
-                test_acc_center['gma'].append(gma_acc)
-                gma_model = deepcopy(gma.P[fitness.index(gma_acc)])
-                break
-
-            # best_fit = gma.tournamentSelection(3, 30)
-            best_fit = gma.rouletteSeletion(30)
-            generations_acc.append(best_fit)
-            print('\nGeneration {} best model\' acc: {}'.format(i, best_fit))
-
-        generations_test_data[epoch] = generations_acc
-
-        # 将最优的模型参数赋值为models
-        updataModels(models, gma_model)
         cost_time = datetime.datetime.now() - start_time
         epoch_cost_time.append(cost_time)
-        print('Epoch %d cost %f s\n' % (epoch, cost_time.seconds))
+        print('\nEpoch %d cost %f s\n' % (epoch, cost_time.seconds))
 
     po.close()
     po.join()
