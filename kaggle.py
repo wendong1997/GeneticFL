@@ -58,8 +58,8 @@ def geneticFL(models, DEVICE, test_loader, pool, GENERATIONS, pm, pc, NP):
             gma_model = deepcopy(gma.P[fitness.index(gma_acc)])
             break
 
-        # best_fit = gma.tournamentSelection(3, NP)
-        best_fit = gma.rouletteSeletion(30)
+        best_fit = gma.tournamentSelection(3, NP)
+        # best_fit = gma.rouletteSeletion(30)
         generations_acc.append(best_fit)
         print('\nGeneration {} best model\' acc: {}'.format(i, best_fit))
     return gma_model, generations_acc
