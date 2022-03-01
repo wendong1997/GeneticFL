@@ -64,7 +64,7 @@ def geneticFL(models, DEVICE, test_loader, pool, GENERATIONS, pm, pc, NP):
         print('\nGeneration {} best model\' acc: {}'.format(i, best_fit))
     return gma_model, generations_acc
 
-def main():
+def run():
     # 设置超参数
     CLIENT_NUM = 10
     EPOCHS = 10  # 总共训练批次
@@ -160,4 +160,4 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    run()
