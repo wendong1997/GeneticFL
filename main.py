@@ -8,7 +8,7 @@ import torch
 import torch.nn.functional as F
 import torch.optim as optim
 
-from models import ConvNet, train, test, getAverageModel
+from model import ConvNet, train, test, getAverageModel
 from GMA import GeneticMergeAlg
 
 

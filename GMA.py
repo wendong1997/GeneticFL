@@ -6,7 +6,7 @@ from multiprocessing import Pool
 import torch
 import numpy as np
 
-from models import ConvNet, getAverageModel, test
+from model import ConvNet, getAverageModel, test
 from utils import changeOneBitInBinary
 
 random.seed(2)
