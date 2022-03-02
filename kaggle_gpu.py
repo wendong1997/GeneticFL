@@ -67,7 +67,6 @@ def geneticFL(models, DEVICE, test_loader, pool, GENERATIONS, select_type, pm, p
     return gma_model, generations_acc
 
 def main(select_tpye):
-    torch.multiprocessing.set_start_method('spawn')
     # 设置超参数
     CLIENT_NUM = 10
     EPOCHS = 10  # 总共训练批次
@@ -97,7 +96,10 @@ def main(select_tpye):
 
     # 多进程
     epoch_cost_time = []
-    po = Pool()
+    ctx = torch.multiprocessing.get_context("spawn")
+    # print(torch.multiprocessing.cpu_count())
+    po = ctx.Pool(5)
+    # po = Pool()
     for epoch in range(1, EPOCHS + 1):
         start_time = datetime.datetime.now()
         train_res = []
