@@ -12,8 +12,6 @@ import torch.optim as optim
 from models import ConvNet, train, test, getAverageModel
 from GMA import GeneticMergeAlg
 
-torch.multiprocessing.set_start_method('spawn')
-
 
 def aggregate(params):
     """
@@ -69,6 +67,7 @@ def geneticFL(models, DEVICE, test_loader, pool, GENERATIONS, select_type, pm, p
     return gma_model, generations_acc
 
 def main(select_tpye):
+    torch.multiprocessing.set_start_method('spawn')
     # 设置超参数
     CLIENT_NUM = 10
     EPOCHS = 10  # 总共训练批次
