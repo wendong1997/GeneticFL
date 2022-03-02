@@ -1,3 +1,4 @@
+import os
 import datetime
 import pickle
 from collections import defaultdict
@@ -91,7 +92,7 @@ def main(select_tpye):
     test_acc_all = defaultdict(list) # 所有参与方节点的测试精度
     test_loss_center = defaultdict(list) # 中心节点测试损失，包括avg聚合、gma聚合
     test_acc_center = defaultdict(list) # 中心节点测试精度
-    generations_test_data = defaultdict(dict)
+    generations_test_acc = defaultdict(dict)
 
     # 多进程
     epoch_cost_time = []
@@ -126,7 +127,8 @@ def main(select_tpye):
         if avg_acc >= sum(participants_now_acc) / CLIENT_NUM:
             gma_model, generations_acc = geneticFL(models, DEVICE, test_loader, po,
                                                    GENERATIONS=50, select_type=select_tpye, pm=0.5, pc=0.8, NP=30)
-            generations_test_data[epoch] = generations_acc
+            test_acc_center['gma'].append(generations_acc[-1])
+            generations_test_acc[epoch] = generations_acc
             best_model = gma_model
         else:
             best_model = avg_model
@@ -143,6 +145,7 @@ def main(select_tpye):
     test_acc_all.update(test_acc_center)
 
     today = datetime.date.today()
+    os.mkdir('./data/result/%s' % today)
     with open('./data/result/%s/GMA_train_loss_all_epoch%d.pkl' % (today, EPOCHS), 'wb') as f:
         pickle.dump(train_loss_all, f)
     with open('./data/result/%s/GMA_test_loss_all_epoch%d.pkl' % (today, EPOCHS), 'wb') as f:
@@ -157,7 +160,7 @@ def main(select_tpye):
         pickle.dump(epoch_cost_time, f)
 
     with open('./data/result/%s/GMA_generations_test_data_epoch%d.pkl' % (today, EPOCHS), 'wb') as f:
-        pickle.dump(generations_test_data, f)
+        pickle.dump(generations_test_acc, f)
 
 
 if __name__ == '__main__':
