@@ -145,7 +145,7 @@ def main(select_tpye):
     test_acc_all.update(test_acc_center)
 
     today = datetime.date.today()
-    os.mkdir('./data/result/%s' % today)
+    os.makedirs('./data/result/%s' % today)
     with open('./data/result/%s/GMA_train_loss_all_epoch%d.pkl' % (today, EPOCHS), 'wb') as f:
         pickle.dump(train_loss_all, f)
     with open('./data/result/%s/GMA_test_loss_all_epoch%d.pkl' % (today, EPOCHS), 'wb') as f:
