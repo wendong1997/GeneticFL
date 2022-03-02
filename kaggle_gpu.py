@@ -40,7 +40,7 @@ def updataModels(models, new_model):
     for i in range(len(models)):
         models[i].load_state_dict(deepcopy(model_param))
 
-def geneticFL(models, DEVICE, test_loader, pool, GENERATIONS, select_type, pm, pc, NP):
+def geneticFL(models, DEVICE, test_loader, GENERATIONS, select_type, pm, pc, NP):
     # 遗传算法优化
     print('\n>>> GMA start ...')
     gma = GeneticMergeAlg(models, DEVICE, test_loader)
@@ -50,7 +50,7 @@ def geneticFL(models, DEVICE, test_loader, pool, GENERATIONS, select_type, pm, p
         print('\nGMA generation %d start \n' % i)
         gma.mutationInLayer(pm)
         gma.crossover(pc)
-        fitness = gma.getFitness(pool)
+        fitness = gma.getFitnessGpu()
 
         # 最后一代的最优个体作为当前epoch的中心节点gma聚合结果
         if i == GENERATIONS - 1:
@@ -94,28 +94,16 @@ def main(select_tpye):
     test_acc_center = defaultdict(list) # 中心节点测试精度
     generations_test_acc = defaultdict(dict)
 
-    # 多进程
     epoch_cost_time = []
-    ctx = torch.multiprocessing.get_context("spawn")
-    # print(torch.multiprocessing.cpu_count())
-    po = ctx.Pool(5)
-    # po = Pool()
     for epoch in range(1, EPOCHS + 1):
         start_time = datetime.datetime.now()
-        train_res = []
-        test_res = []
 
-        # 多进程模拟参与方节点训练、测试
+        # 模拟0-9号参与方节点训练、测试并保存loss acc
         for i in range(CLIENT_NUM):
-            train_res.append(po.apply_async(train, args=(models[i], DEVICE, train_loaders[i], optimizers[i], epoch, i)))
+            train_loss = train(models[i], DEVICE, train_loaders[i], optimizers[i], epoch, i)
+            train_loss_all[i].append(train_loss)
         for i in range(CLIENT_NUM):
-            test_res.append(po.apply_async(test, args=(models[i], DEVICE, test_loader, i)))
-
-        # 保存loss acc，0-9号参与节点
-        for i in range(len(train_res)):
-            train_loss_all[i].append(train_res[i].get())
-        for i in range(len(test_res)):
-            loss, acc = test_res[i].get()
+            loss, acc = test(models[i], DEVICE, test_loader, i)
             test_loss_all[i].append(loss)
             test_acc_all[i].append(acc)
 
@@ -128,7 +116,7 @@ def main(select_tpye):
         # 中心方测试精度优于参与方时进行遗传优化
         participants_now_acc = [test_acc_all[i][-1] for i in range(CLIENT_NUM)]
         if avg_acc >= sum(participants_now_acc) / CLIENT_NUM:
-            gma_model, generations_acc = geneticFL(models, DEVICE, test_loader, po,
+            gma_model, generations_acc = geneticFL(models, DEVICE, test_loader,
                                                    GENERATIONS=50, select_type=select_tpye, pm=0.5, pc=0.8, NP=30)
             test_acc_center['gma'].append(generations_acc[-1])
             generations_test_acc[epoch] = generations_acc
@@ -141,8 +129,6 @@ def main(select_tpye):
         epoch_cost_time.append(cost_time)
         print('\nEpoch %d cost %f s\n' % (epoch, cost_time.seconds))
 
-    po.close()
-    po.join()
 
     test_loss_all.update(test_loss_center)
     test_acc_all.update(test_acc_center)
@@ -167,4 +153,4 @@ def main(select_tpye):
 
 
 if __name__ == '__main__':
-    main()
+    main(1)

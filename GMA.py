@@ -124,6 +124,14 @@ class GeneticMergeAlg(object):
         self.fitness = fitness
         return fitness
 
+    def getFitnessGpu(self):
+        fitness = [] # [i, P[i]的test_acc]
+        for i in range(len(self.P)):
+            _, tmp_acc = test(self.P[i], self.device, self.test_loader, i)
+            fitness.append(tmp_acc)
+        self.fitness = fitness
+        return fitness
+
     def select(self, po, device, test_loader):
         callback = []
         res = []
