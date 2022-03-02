@@ -39,7 +39,7 @@ def updataModels(models, new_model):
     for i in range(len(models)):
         models[i].load_state_dict(deepcopy(model_param))
 
-def geneticFL(models, DEVICE, test_loader, pool, GENERATIONS, pm, pc, NP):
+def geneticFL(models, DEVICE, test_loader, pool, GENERATIONS, select_type, pm, pc, NP):
     # 遗传算法优化
     print('\n>>> GMA start ...')
     gma = GeneticMergeAlg(models, DEVICE, test_loader)
@@ -57,14 +57,15 @@ def geneticFL(models, DEVICE, test_loader, pool, GENERATIONS, pm, pc, NP):
             # test_acc_center['gma'].append(gma_acc)
             gma_model = deepcopy(gma.P[fitness.index(gma_acc)])
             break
-
-        # best_fit = gma.tournamentSelection(3, NP)
-        best_fit = gma.rouletteSeletion(30)
+        if select_type == 1:
+            best_fit = gma.tournamentSelection(3, NP)
+        else:
+            best_fit = gma.rouletteSeletion(30)
         generations_acc.append(best_fit)
         print('\nGeneration {} best model\' acc: {}'.format(i, best_fit))
     return gma_model, generations_acc
 
-def main():
+def main(select_tpye):
     # 设置超参数
     CLIENT_NUM = 10
     EPOCHS = 10  # 总共训练批次
@@ -124,7 +125,7 @@ def main():
         participants_now_acc = [test_acc_all[i][-1] for i in range(CLIENT_NUM)]
         if avg_acc >= sum(participants_now_acc) / CLIENT_NUM:
             gma_model, generations_acc = geneticFL(models, DEVICE, test_loader, po,
-                                                   GENERATIONS=50, pm=0.5, pc=0.8, NP=30)
+                                                   GENERATIONS=50, select_type=select_tpye, pm=0.5, pc=0.8, NP=30)
             generations_test_data[epoch] = generations_acc
             best_model = gma_model
         else:
