@@ -157,7 +157,7 @@ def main(select_tpye):
         pickle.dump(epoch_cost_time, f)
 
     with open('./data/result/%s/GMA_generations_test_data_epoch%d.pkl' % (today, EPOCHS), 'wb') as f:
-        pickle.dump(generations_test_data, f)\
+        pickle.dump(generations_test_data, f)
 
 
 if __name__ == '__main__':
