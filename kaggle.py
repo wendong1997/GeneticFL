@@ -4,6 +4,7 @@ import pickle
 from collections import defaultdict
 from copy import deepcopy
 from multiprocessing import Pool
+from zipfile import ZipFile
 
 import torch
 import torch.nn.functional as F
@@ -59,9 +60,9 @@ def geneticFL(models, DEVICE, test_loader, pool, GENERATIONS, select_type, pm, p
             gma_model = deepcopy(gma.P[fitness.index(gma_acc)])
             break
         if select_type == 1:
-            best_fit = gma.tournamentSelection(3, NP)
+            best_fit = gma.tournamentSelection(3, NP) # 锦标赛选择
         else:
-            best_fit = gma.rouletteSeletion(30)
+            best_fit = gma.rouletteSeletion(30) # 轮盘赌选择
         generations_acc.append(best_fit)
         print('\nGeneration {} best model\' acc: {}'.format(i, best_fit))
     return gma_model, generations_acc
@@ -69,9 +70,9 @@ def geneticFL(models, DEVICE, test_loader, pool, GENERATIONS, select_type, pm, p
 def main(select_tpye):
     # 设置超参数
     CLIENT_NUM = 10
-    EPOCHS = 10  # 总共训练批次
+    EPOCHS = 2  # 总共训练批次
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    GENERATIONS = 50
+    GENERATIONS = 2
 
     # 读取分割后的数据集
     data_path = r'./data/MNIST_data_nodes_%d.pickle' % CLIENT_NUM
@@ -126,7 +127,7 @@ def main(select_tpye):
         participants_now_acc = [test_acc_all[i][-1] for i in range(CLIENT_NUM)]
         if avg_acc >= sum(participants_now_acc) / CLIENT_NUM:
             gma_model, generations_acc = geneticFL(models, DEVICE, test_loader, po,
-                                                   GENERATIONS=50, select_type=select_tpye, pm=0.5, pc=0.8, NP=30)
+                                                   GENERATIONS=GENERATIONS, select_type=select_tpye, pm=0.5, pc=0.8, NP=30)
             test_acc_center['gma'].append(generations_acc[-1])
             generations_test_acc[epoch] = generations_acc
             best_model = gma_model
@@ -145,23 +146,29 @@ def main(select_tpye):
     test_acc_all.update(test_acc_center)
 
     today = datetime.date.today()
-    os.makedirs('./data/result/%s' % today)
-    with open('./data/result/%s/GMA_train_loss_all_epoch%d.pkl' % (today, EPOCHS), 'wb') as f:
+    save_path = './%s' % today
+    if not os.path.isdir(save_path):
+        os.makedirs(save_path)
+    with open('./%s/GMA_train_loss_all_epoch%d.pkl' % (today, EPOCHS), 'wb') as f:
         pickle.dump(train_loss_all, f)
-    with open('./data/result/%s/GMA_test_loss_all_epoch%d.pkl' % (today, EPOCHS), 'wb') as f:
+    with open('./%s/GMA_test_loss_all_epoch%d.pkl' % (today, EPOCHS), 'wb') as f:
         pickle.dump(test_loss_all, f)
-    with open('./data/result/%s/GMA_test_acc_all_epoch%d.pkl' % (today, EPOCHS), 'wb') as f:
+    with open('./%s/GMA_test_acc_all_epoch%d.pkl' % (today, EPOCHS), 'wb') as f:
         pickle.dump(test_acc_all, f)
-    with open('./data/result/%s/GMA_test_loss_center_epoch%d.pkl' % (today, EPOCHS), 'wb') as f:
+    with open('./%s/GMA_test_loss_center_epoch%d.pkl' % (today, EPOCHS), 'wb') as f:
         pickle.dump(test_loss_center, f)
-    with open('./data/result/%s/GMA_test_acc_center_epoch%d.pkl' % (today, EPOCHS), 'wb') as f:
+    with open('./%s/GMA_test_acc_center_epoch%d.pkl' % (today, EPOCHS), 'wb') as f:
         pickle.dump(test_acc_center, f)
-    with open('./data/result/%s/GMA_cost_time_epoch%d.pkl' % (today, EPOCHS), 'wb') as f:
+    with open('./%s/GMA_cost_time_epoch%d.pkl' % (today, EPOCHS), 'wb') as f:
         pickle.dump(epoch_cost_time, f)
-
-    with open('./data/result/%s/GMA_generations_test_data_epoch%d.pkl' % (today, EPOCHS), 'wb') as f:
+    with open('./%s/GMA_generations_test_data_epoch%d.pkl' % (today, EPOCHS), 'wb') as f:
         pickle.dump(generations_test_acc, f)
 
+    # 压缩文件夹
+    select_name = '锦标赛选择' if select_tpye == 1 else '轮盘赌选择'
+    with ZipFile('%s%s.zip' % (select_name, today), 'w') as f:
+        for file in os.listdir(save_path):
+            f.write(os.path.join(save_path, file))
 
 if __name__ == '__main__':
-    main()
+    main(1)
