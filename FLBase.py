@@ -113,7 +113,7 @@ def aggregate(params):
 if __name__ == '__main__':
     # 设置超参数
     CLIENT_NUM = 10
-    EPOCHS = 10  # 总共训练批次
+    EPOCHS = 50  # 总共训练批次
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # 读取分割后的数据集
