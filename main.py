@@ -87,6 +87,7 @@ if __name__ == '__main__':
     # models[0].state_dict()
 
     train_loss_all = defaultdict(list) # 所有参与方节点的训练损失
+    train_acc_all = defaultdict(list) # 所有参与方节点的训练精度
     test_loss_all = defaultdict(list) # 所有参与方节点的测试损失
     test_acc_all = defaultdict(list) # 所有参与方节点的测试精度
     test_loss_center = defaultdict(list) # 中心节点测试损失，包括avg聚合、gma聚合
@@ -109,11 +110,14 @@ if __name__ == '__main__':
 
         # 保存loss acc，0-9号参与节点
         for i in range(len(train_res)):
-            train_loss_all[i].append(train_res[i].get())
+            train_loss, train_acc = train_res[i].get()
+            train_loss_all[i].append(train_loss)
+            train_acc_all[i].append(train_acc)
+
         for i in range(len(test_res)):
-            loss, acc = test_res[i].get()
-            test_loss_all[i].append(loss)
-            test_acc_all[i].append(acc)
+            test_loss, test_acc = test_res[i].get()
+            test_loss_all[i].append(test_loss)
+            test_acc_all[i].append(test_acc)
 
         # 联邦聚合，聚合后测试
         avg_model = getAverageModel(models)
@@ -185,6 +189,8 @@ if __name__ == '__main__':
     today = datetime.date.today()
     with open('./data/result/%s/GMA_train_loss_all_epoch%d.pkl' % (today, EPOCHS), 'wb') as f:
         pickle.dump(train_loss_all, f)
+    with open('./data/result/%s/GMA_train_acc_all_epoch%d.pkl' % (today, EPOCHS), 'wb') as f:
+        pickle.dump(train_acc_all, f)
     with open('./data/result/%s/GMA_test_loss_all_epoch%d.pkl' % (today, EPOCHS), 'wb') as f:
         pickle.dump(test_loss_all, f)
     with open('./data/result/%s/GMA_test_acc_all_epoch%d.pkl' % (today, EPOCHS), 'wb') as f:

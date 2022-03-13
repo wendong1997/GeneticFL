@@ -44,6 +44,7 @@ def train(model, device, train_loader, optimizer, epoch, node_num):
     """
     print('Node %d starts training...' % node_num)
     model.train()
+    correct = 0
     for batch_idx, (data, target) in enumerate(train_loader):
         data, target = data.to(device), target.to(device)
         optimizer.zero_grad()
@@ -51,14 +52,18 @@ def train(model, device, train_loader, optimizer, epoch, node_num):
         loss = F.nll_loss(output, target)
         loss.backward()
         optimizer.step()
+        pred = output.max(1, keepdim=True)[1]  # 找到概率最大的下标
+        correct += pred.eq(target.view_as(pred)).sum().item()
         if (batch_idx + 1) % 31 == 0:
             print('Node {} Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
                 node_num, epoch, (batch_idx+1) * len(data), len(train_loader.dataset),
                        100. * (batch_idx+1) / len(train_loader), loss.item()))
             # break
         if batch_idx == len(train_loader)-1:
-            print('Node {} Train Epoch: {}\tFinal Loss: {:.6f}'.format(node_num, epoch, loss.item()))
-            return loss.item()
+            train_acc = correct / len(train_loader.dataset)
+            print('Node {} Train Epoch: {}\tFinal Loss: {:.6f}\tAcc: {:.6f}'.format(
+                node_num, epoch, loss.item(), train_acc))
+            return loss.item(), train_acc
 
 
 def test(model, device, test_loader, node_num):
