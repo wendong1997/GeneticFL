@@ -50,10 +50,10 @@ if __name__ == '__main__':
     test_loader = all_data['test_data']
 
     # 初始化模型和优化器
-    first_param = torch.load('./data/ModelParam.pth')
     models = [ConvNet().to(DEVICE) for _ in range(CLIENT_NUM)]
-    for i in range(len(models)):
-        models[i].load_state_dict(first_param)
+    # first_param = torch.load('./data/ModelParam.pth')
+    # for i in range(len(models)):
+    #     models[i].load_state_dict(first_param)
     optimizers = [optim.Adam(models[i].parameters()) for i in range(CLIENT_NUM)]
 
     # 设置存储容器
@@ -70,14 +70,14 @@ if __name__ == '__main__':
         start_time = datetime.datetime.now()
         params = []
         for i in range(2):
-            train(models[i], DEVICE, train_loaders[i], optimizers[i], epoch, i, train_loss_all)
-            test(models[i], DEVICE, test_loader, i, test_loss_all, test_acc_all)
+            train(models[i], DEVICE, train_loaders[i], optimizers[i], epoch, i)
+            test(models[i], DEVICE, test_loader, i)
             params.append(list(models[i].parameters()))
         end_time = datetime.datetime.now()
         cost_time = end_time - start_time
         print('Epoch %d cost %f s' % (epoch, cost_time.seconds))
         aggregate(params)
-        test(models[0], DEVICE, test_loader, 10, test_loss_all, test_acc_all) # 中心节点编号为10
+        test(models[0], DEVICE, test_loader, 10) # 中心节点编号为10
 
     # 分别存储loss acc
     for key, val in train_loss_all.items():
