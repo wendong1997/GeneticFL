@@ -160,5 +160,5 @@ if __name__ == '__main__':
         pickle.dump(test_acc_center, f)
     with open('./data/result/%s/GMA_cost_time_epoch%d.pkl' % (today, EPOCHS), 'wb') as f:
         pickle.dump(epoch_cost_time, f)
-    with open('./data/result/%s/GMA_generations_test_data_epoch%d.pkl' % (today, EPOCHS), 'wb') as f:
+    with open('./data/result/%s/GMA_generations_test_acc_epoch%d.pkl' % (today, EPOCHS), 'wb') as f:
         pickle.dump(generations_test_acc, f)
