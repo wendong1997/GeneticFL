@@ -1,8 +1,10 @@
 import datetime
+import os
 import pickle
 from collections import defaultdict
 from copy import deepcopy
 from multiprocessing import Pool, cpu_count
+from zipfile import ZipFile
 
 import torch
 import torch.nn as nn
@@ -10,92 +12,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 import numpy as np
 
-# 模型定义
-class ConvNet(nn.Module):
-    def __init__(self):
-        super().__init__()
-        # 1,28x28
-        self.conv1 = nn.Conv2d(1, 10, 5)  # 24x24
-        self.pool = nn.MaxPool2d(2, 2)  # 12x12
-        self.conv2 = nn.Conv2d(10, 20, 3)  # 10x10
-        self.fc1 = nn.Linear(20 * 10 * 10, 500)
-        self.fc2 = nn.Linear(500, 10)
-
-    def forward(self, x):
-        in_size = x.size(0)
-        out = self.conv1(x)  # 24
-        out = F.relu(out)
-        out = self.pool(out)  # 12
-        out = self.conv2(out)  # 10
-        out = F.relu(out)
-        out = out.view(in_size, -1)
-        out = self.fc1(out)
-        out = F.relu(out)
-        out = self.fc2(out)
-        out = F.log_softmax(out, dim=1)
-        return out
-
-
-def train(model, device, train_loader, optimizer, epoch, node_num, train_loss_all=None):
-    """
-    训练函数定义
-    :param model:
-    :param device:
-    :param train_loader:
-    :param optimizer:
-    :param epoch:
-    :param node_num: 节点编号
-    :param train_loss_all: 训练损失字典，全局变量
-    :return: 训练精度
-    """
-    print('Node %d starts training...' % node_num)
-    model.train()
-    correct = 0
-    for batch_idx, (data, target) in enumerate(train_loader):
-        data, target = data.to(device), target.to(device)
-        optimizer.zero_grad()
-        output = model(data)
-        loss = F.nll_loss(output, target)
-        loss.backward()
-        optimizer.step()
-
-        # _, id = torch.max(output.data, 1)
-        # correct += torch.sum(id == target.data)
-        pred = output.max(1, keepdim=True)[1]  # 找到概率最大的下标
-        correct += pred.eq(target.view_as(pred)).sum().item()
-
-        if (batch_idx + 1) % 31 == 0:
-            print('Node {} Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
-                node_num, epoch, (batch_idx+1) * len(data), len(train_loader.dataset),
-                       100. * (batch_idx+1) / len(train_loader), loss.item()))
-            # break
-        if batch_idx == len(train_loader)-1:
-            train_acc = correct / len(train_loader.dataset)
-            print('Node {} Train Epoch: {}\tLoss: {:.6f}\tAcc: {:.6f}'.format(
-                node_num, epoch, loss.item(), train_acc))
-            # train_loss_all[node_num].append(loss.item())
-            return loss.item()
-
-def test(model, device, test_loader, node_num, test_loss_all=None, test_acc_all=None):
-    model.eval()
-    test_loss = 0
-    correct = 0
-    with torch.no_grad():
-        for data, target in test_loader:
-            data, target = data.to(device), target.to(device)
-            output = model(data)
-            test_loss += F.nll_loss(output, target, reduction='sum').item()  # 将一批的损失相加
-            pred = output.max(1, keepdim=True)[1]  # 找到概率最大的下标
-            correct += pred.eq(target.view_as(pred)).sum().item()
-
-    test_loss /= len(test_loader.dataset)
-    test_acc = correct / len(test_loader.dataset)
-    print('\nNode {} Test set: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
-        node_num, test_loss, correct, len(test_loader.dataset),
-        100. * test_acc))
-    # test_loss_all[node_num].append(test_loss)
-    # test_acc_all[node_num].append(test_acc)
-    return test_loss, test_acc
+from model import ConvNet, train, test
 
 
 def aggregate(params):
@@ -126,20 +43,21 @@ if __name__ == '__main__':
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # 读取分割后的数据集
-    data_path = r'./data/MNIST_data_nodes_%d.pickle' % CLIENT_NUM
+    data_path = r'./data/MNIST_data_nodes_100.pkl'
     with open(data_path, 'rb') as f:
-        client_data = pickle.load(f)
-    train_loaders = client_data['train_data']
-    test_loader = client_data['test_data']
+        all_data = pickle.load(f)
+    train_loaders = all_data['train_data']
+    test_loader = all_data['test_data']
 
     # 初始化模型和优化器
     models = [ConvNet().to(DEVICE) for _ in range(CLIENT_NUM)]
     optimizers = [optim.Adam(models[i].parameters()) for i in range(CLIENT_NUM)]
 
-    # 保存数据
-    train_loss_all = defaultdict(list) # 所有节点的训练损失
-    test_loss_all = defaultdict(list) # 所有节点的测试损失
-    test_acc_all = defaultdict(list) # 所有节点的测试精度
+    # 设置存储容器
+    train_loss_all = defaultdict(list) # 所有参与方节点的训练损失
+    train_acc_all = defaultdict(list) # 所有参与方节点的训练精度
+    test_loss_all = defaultdict(list) # 所有参与方节点的测试损失
+    test_acc_all = defaultdict(list) # 所有参与方节点的测试精度
     test_loss_avg = [] # 中心节点测试损失
     test_acc_avg = [] # 中心节点测试精度
 
@@ -175,24 +93,27 @@ if __name__ == '__main__':
         train_res = []
         test_res = []
 
-        # 多进程训练、测试
+        # 多进程模拟参与方节点训练、测试
         for i in range(CLIENT_NUM):
             train_res.append(po.apply_async(train, args=(models[i], DEVICE, train_loaders[i], optimizers[i], epoch, i)))
         for i in range(CLIENT_NUM):
             test_res.append(po.apply_async(test, args=(models[i], DEVICE, test_loader, i)))
 
-        # 保存loss acc
+        # 保存参与节点训练集和测试集的loss acc
         for i in range(len(train_res)):
-            train_loss_all[i].append(train_res[i].get())
+            train_loss, train_acc = train_res[i].get()
+            train_loss_all[i].append(train_loss)
+            train_acc_all[i].append(train_acc)
         for i in range(len(test_res)):
-            loss, acc = test_res[i].get()
-            test_loss_all[i].append(loss)
-            test_acc_all[i].append(acc)
+            test_loss, test_acc = test_res[i].get()
+            test_loss_all[i].append(test_loss)
+            test_acc_all[i].append(test_acc)
 
         # 联邦聚合、测试
         params = [list(models[i].parameters()) for i in range(CLIENT_NUM)]
         aggregate(params)
         loss, acc = test(models[0], DEVICE, test_loader, 'avg') # 中心节点编号为 avg
+        print('Avg Model\'s Loss: {:.6f}\tAcc: {:.6f}'.format(loss, acc))
         test_loss_avg.append(loss)
         test_acc_avg.append(acc)
 
@@ -208,15 +129,26 @@ if __name__ == '__main__':
     test_loss_all['avg'] = test_loss_avg
     test_acc_all['avg'] = test_acc_avg
 
-    with open('./data/result/FL_train_loss_all_epoch%d.pkl' % EPOCHS, 'wb') as f:
+    # 持久化存储
+    save_path = './FL'
+    if not os.path.isdir(save_path):
+        os.makedirs(save_path)
+    with open('./FL/FL_train_loss_all_epoch%d.pkl' % EPOCHS, 'wb') as f:
         pickle.dump(train_loss_all, f)
-    with open('./data/result/FL_test_loss_all_epoch%d.pkl' % EPOCHS, 'wb') as f:
+    with open('./FL/FL_train_acc_all_epoch%d.pkl' % EPOCHS, 'wb') as f:
+        pickle.dump(train_acc_all, f)
+    with open('./FL/FL_test_loss_all_epoch%d.pkl' % EPOCHS, 'wb') as f:
         pickle.dump(test_loss_all, f)
-    with open('./data/result/FL_test_acc_all_epoch%d.pkl' % EPOCHS, 'wb') as f:
+    with open('./FL/FL_test_acc_all_epoch%d.pkl' % EPOCHS, 'wb') as f:
         pickle.dump(test_acc_all, f)
-    with open('./data/result/FL_test_loss_avg_epoch%d.pkl' % EPOCHS, 'wb') as f:
+    with open('./FL/FL_test_loss_avg_epoch%d.pkl' % EPOCHS, 'wb') as f:
         pickle.dump(test_loss_avg, f)
-    with open('./data/result/FL_test_acc_avg_epoch%d.pkl' % EPOCHS, 'wb') as f:
+    with open('./FL/FL_test_acc_avg_epoch%d.pkl' % EPOCHS, 'wb') as f:
         pickle.dump(test_acc_avg, f)
-    with open('./data/result/FL_cost_time_epoch%d.pkl' % EPOCHS, 'wb') as f:
+    with open('./FL/FL_cost_time_epoch%d.pkl' % EPOCHS, 'wb') as f:
         pickle.dump(epoch_cost_time, f)
+
+    # 压缩文件夹
+    with ZipFile('FL.zip', 'w') as f:
+        for file in os.listdir(save_path):
+            f.write(os.path.join(save_path, file))
