@@ -42,7 +42,7 @@ def train(model, device, train_loader, optimizer, epoch, node_num):
     :param node_num: 节点编号
     :return: 训练精度
     """
-    print('Node %d starts training...' % node_num)
+    print('Node {} starts training...'.format(node_num))
     model.train()
     correct = 0
     for batch_idx, (data, target) in enumerate(train_loader):
@@ -66,7 +66,7 @@ def train(model, device, train_loader, optimizer, epoch, node_num):
             return loss.item(), train_acc
 
 
-def test(model, device, test_loader, node_num):
+def test(model, device, test_loader, node_num=None):
     model.eval()
     test_loss = 0
     correct = 0
