@@ -50,7 +50,8 @@ if __name__ == '__main__':
     test_loader = all_data['test_data']
 
     # 初始化模型和优化器
-    models = [ConvNet().to(DEVICE) for _ in range(CLIENT_NUM)]
+    first_param = torch.load('./data/ModelParam.pth')
+    models = [ConvNet().to(DEVICE).load_state_dict(first_param) for _ in range(CLIENT_NUM)]
     optimizers = [optim.Adam(models[i].parameters()) for i in range(CLIENT_NUM)]
 
     # 设置存储容器
