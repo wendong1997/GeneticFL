@@ -4,6 +4,7 @@ import pickle
 from collections import defaultdict
 from copy import deepcopy
 from multiprocessing import Pool
+from zipfile import ZipFile
 
 import torch
 import torch.nn.functional as F
@@ -40,7 +41,7 @@ def updataModels(models, new_model):
     for i in range(len(models)):
         models[i].load_state_dict(deepcopy(model_param))
 
-def geneticFL(models, DEVICE, test_loader, GENERATIONS, select_type, pm, pc, NP):
+def geneticFL(models, DEVICE, test_loader, pool, GENERATIONS, pm, pc, NP):
     # 遗传算法优化
     print('\n>>> GMA start ...')
     gma = GeneticMergeAlg(models, DEVICE, test_loader)
@@ -50,23 +51,24 @@ def geneticFL(models, DEVICE, test_loader, GENERATIONS, select_type, pm, pc, NP)
         print('\nGMA generation %d start \n' % i)
         gma.mutationInLayer(pm)
         gma.crossover(pc)
-        fitness = gma.getFitnessGpu()
+        fitness = gma.getFitness(pool)
 
         # 最后一代的最优个体作为当前epoch的中心节点gma聚合结果
         if i == GENERATIONS - 1:
             gma_acc = max(fitness)
-            # test_acc_center['gma'].append(gma_acc)
             gma_model = deepcopy(gma.P[fitness.index(gma_acc)])
+            generations_acc.append(gma_acc)
+            print('\nGeneration {} best model\' acc: {}'.format(i, gma_acc))
             break
-        if select_type == 1:
-            best_fit = gma.tournamentSelection(3, NP)
-        else:
-            best_fit = gma.rouletteSeletion(30)
+
+        # best_fit = gma.tournamentSelection(3, NP) # 锦标赛选择
+        best_fit = gma.rouletteSeletion(30) # 轮盘赌选择
         generations_acc.append(best_fit)
         print('\nGeneration {} best model\' acc: {}'.format(i, best_fit))
     return gma_model, generations_acc
 
-def main(select_tpye):
+if __name__ == '__main__':
+    torch.multiprocessing.set_start_method('spawn')
     # 设置超参数
     CLIENT_NUM = 10
     EPOCHS = 10  # 总共训练批次
@@ -85,39 +87,51 @@ def main(select_tpye):
     # 初始化模型和优化器
     models = [ConvNet().to(DEVICE) for _ in range(CLIENT_NUM)]
     optimizers = [optim.Adam(models[i].parameters()) for i in range(CLIENT_NUM)] # 针对model i 的优化器
-    # models[0].state_dict()
 
+    # 设置存储容器
     train_loss_all = defaultdict(list) # 所有参与方节点的训练损失
+    train_acc_all = defaultdict(list) # 所有参与方节点的训练精度
     test_loss_all = defaultdict(list) # 所有参与方节点的测试损失
     test_acc_all = defaultdict(list) # 所有参与方节点的测试精度
     test_loss_center = defaultdict(list) # 中心节点测试损失，包括avg聚合、gma聚合
     test_acc_center = defaultdict(list) # 中心节点测试精度
     generations_test_acc = defaultdict(dict)
 
+    # 多进程
     epoch_cost_time = []
+    po = Pool()
     for epoch in range(1, EPOCHS + 1):
         start_time = datetime.datetime.now()
+        train_res = []
+        test_res = []
 
-        # 模拟0-9号参与方节点训练、测试并保存loss acc
+        # 多进程模拟参与方节点训练、测试
         for i in range(CLIENT_NUM):
-            train_loss = train(models[i], DEVICE, train_loaders[i], optimizers[i], epoch, i)
+            train_res.append(po.apply_async(train, args=(models[i], DEVICE, train_loaders[i], optimizers[i], epoch, i)))
+        for i in range(CLIENT_NUM):
+            test_res.append(po.apply_async(test, args=(models[i], DEVICE, test_loader, i)))
+
+        # 保存参与节点训练集和测试集的loss acc
+        for i in range(len(train_res)):
+            train_loss, train_acc = train_res[i].get()
             train_loss_all[i].append(train_loss)
-        for i in range(CLIENT_NUM):
-            loss, acc = test(models[i], DEVICE, test_loader, i)
-            test_loss_all[i].append(loss)
-            test_acc_all[i].append(acc)
+            train_acc_all[i].append(train_acc)
+        for i in range(len(test_res)):
+            test_loss, test_acc = test_res[i].get()
+            test_loss_all[i].append(test_loss)
+            test_acc_all[i].append(test_acc)
 
         # 联邦聚合，聚合后测试
         avg_model = getAverageModel(models)
         avg_loss, avg_acc = test(avg_model, DEVICE, test_loader, 'avg')
-        test_loss_center['avg'].append(avg_loss)
+        # test_loss_center['avg'].append(avg_loss)
         test_acc_center['avg'].append(avg_acc)
 
-        # 中心方测试精度优于参与方时进行遗传优化
+        # 中心方测试精度优于参与方平均测试精度时进行遗传优化
         participants_now_acc = [test_acc_all[i][-1] for i in range(CLIENT_NUM)]
         if avg_acc >= sum(participants_now_acc) / CLIENT_NUM:
-            gma_model, generations_acc = geneticFL(models, DEVICE, test_loader,
-                                                   GENERATIONS=GENERATIONS, select_type=select_tpye, pm=0.5, pc=0.8, NP=30)
+            gma_model, generations_acc = geneticFL(models, DEVICE, test_loader, po,
+                                                   GENERATIONS=GENERATIONS, pm=0.5, pc=0.8, NP=30)
             test_acc_center['gma'].append(generations_acc[-1])
             generations_test_acc[epoch] = generations_acc
             best_model = gma_model
@@ -129,28 +143,40 @@ def main(select_tpye):
         epoch_cost_time.append(cost_time)
         print('\nEpoch %d cost %f s\n' % (epoch, cost_time.seconds))
 
+    po.close()
+    po.join()
 
     test_loss_all.update(test_loss_center)
     test_acc_all.update(test_acc_center)
 
     today = datetime.date.today()
-    os.makedirs('./data/result/%s' % today)
-    with open('./data/result/%s/GMA_train_loss_all_epoch%d.pkl' % (today, EPOCHS), 'wb') as f:
-        pickle.dump(train_loss_all, f)
-    with open('./data/result/%s/GMA_test_loss_all_epoch%d.pkl' % (today, EPOCHS), 'wb') as f:
-        pickle.dump(test_loss_all, f)
-    with open('./data/result/%s/GMA_test_acc_all_epoch%d.pkl' % (today, EPOCHS), 'wb') as f:
-        pickle.dump(test_acc_all, f)
-    with open('./data/result/%s/GMA_test_loss_center_epoch%d.pkl' % (today, EPOCHS), 'wb') as f:
-        pickle.dump(test_loss_center, f)
-    with open('./data/result/%s/GMA_test_acc_center_epoch%d.pkl' % (today, EPOCHS), 'wb') as f:
-        pickle.dump(test_acc_center, f)
-    with open('./data/result/%s/GMA_cost_time_epoch%d.pkl' % (today, EPOCHS), 'wb') as f:
-        pickle.dump(epoch_cost_time, f)
+    save_path = os.path.join('./', str(today))
+    if not os.path.isdir(save_path):
+        os.makedirs(save_path)
 
-    with open('./data/result/%s/GMA_generations_test_data_epoch%d.pkl' % (today, EPOCHS), 'wb') as f:
+    with open('./%s/GMA_train_loss_all_epoch%d.pkl' % (today, EPOCHS), 'wb') as f:
+        pickle.dump(train_loss_all, f)
+    with open('./%s/GMA_train_acc_all_epoch%d.pkl' % (today, EPOCHS), 'wb') as f:
+        pickle.dump(train_acc_all, f)
+    with open('./%s/GMA_test_loss_all_epoch%d.pkl' % (today, EPOCHS), 'wb') as f:
+        pickle.dump(test_loss_all, f)
+    with open('./%s/GMA_test_acc_all_epoch%d.pkl' % (today, EPOCHS), 'wb') as f:
+        pickle.dump(test_acc_all, f)
+    with open('./%s/GMA_test_loss_center_epoch%d.pkl' % (today, EPOCHS), 'wb') as f:
+        pickle.dump(test_loss_center, f)
+    with open('./%s/GMA_test_acc_center_epoch%d.pkl' % (today, EPOCHS), 'wb') as f:
+        pickle.dump(test_acc_center, f)
+    with open('./%s/GMA_cost_time_epoch%d.pkl' % (today, EPOCHS), 'wb') as f:
+        pickle.dump(epoch_cost_time, f)
+    with open('./%s/GMA_generations_test_acc_epoch%d.pkl' % (today, EPOCHS), 'wb') as f:
         pickle.dump(generations_test_acc, f)
 
+    # 压缩文件夹
+    with ZipFile('%s.zip' % today, 'w') as f:
+        for file in os.listdir(save_path):
+            f.write(os.path.join(save_path, file))
 
-if __name__ == '__main__':
-    main(1)
+    # select_name = '锦标赛选择' if select_tpye == 1 else '轮盘赌选择'
+    # with ZipFile('%s%s.zip' % (select_name, today), 'w') as f:
+    #     for file in os.listdir(save_path):
+    #         f.write(os.path.join(save_path, file))
