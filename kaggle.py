@@ -41,7 +41,7 @@ def updataModels(models, new_model):
     for i in range(len(models)):
         models[i].load_state_dict(deepcopy(model_param))
 
-def geneticFL(models, DEVICE, test_loader, pool, GENERATIONS, select_type, pm, pc, NP):
+def geneticFL(models, DEVICE, test_loader, pool, GENERATIONS, pm, pc, NP):
     # 遗传算法优化
     print('\n>>> GMA start ...')
     gma = GeneticMergeAlg(models, DEVICE, test_loader)
@@ -56,38 +56,38 @@ def geneticFL(models, DEVICE, test_loader, pool, GENERATIONS, select_type, pm, p
         # 最后一代的最优个体作为当前epoch的中心节点gma聚合结果
         if i == GENERATIONS - 1:
             gma_acc = max(fitness)
-            # test_acc_center['gma'].append(gma_acc)
             gma_model = deepcopy(gma.P[fitness.index(gma_acc)])
+            generations_acc.append(gma_acc)
+            print('\nGeneration {} best model\' acc: {}'.format(i, gma_acc))
             break
-        if select_type == 1:
-            best_fit = gma.tournamentSelection(3, NP) # 锦标赛选择
-        else:
-            best_fit = gma.rouletteSeletion(30) # 轮盘赌选择
+
+        best_fit = gma.tournamentSelection(3, NP) # 锦标赛选择
+        # best_fit = gma.rouletteSeletion(30) # 轮盘赌选择
         generations_acc.append(best_fit)
         print('\nGeneration {} best model\' acc: {}'.format(i, best_fit))
     return gma_model, generations_acc
 
-def main(select_tpye):
+if __name__ == '__main__':
     # 设置超参数
     CLIENT_NUM = 10
-    EPOCHS = 2  # 总共训练批次
+    EPOCHS = 10  # 总共训练批次
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    GENERATIONS = 2
+    GENERATIONS = 50
 
     # 读取分割后的数据集
-    data_path = r'./data/MNIST_data_nodes_%d.pickle' % CLIENT_NUM
+    data_path = r'./data/MNIST_data_nodes_100.pkl'
     with open(data_path, 'rb') as f:
-        client_data = pickle.load(f)
-    train_loaders = client_data['train_data']
-    # test_loader = client_data['test_data']
-    with open('./data/MNIST_onetenth_testloader.pkl', 'rb') as f:
-        test_loader = pickle.load(f)
+        all_data = pickle.load(f)
+    train_loaders = all_data['train_data']
+    test_loader = all_data['test_data']
+    # with open('./data/MNIST_onetenth_testloader.pkl', 'rb') as f:
+    #     test_loader = pickle.load(f)
 
     # 初始化模型和优化器
     models = [ConvNet().to(DEVICE) for _ in range(CLIENT_NUM)]
     optimizers = [optim.Adam(models[i].parameters()) for i in range(CLIENT_NUM)] # 针对model i 的优化器
-    # models[0].state_dict()
 
+    # 设置存储容器
     train_loss_all = defaultdict(list) # 所有参与方节点的训练损失
     test_loss_all = defaultdict(list) # 所有参与方节点的测试损失
     test_acc_all = defaultdict(list) # 所有参与方节点的测试精度
@@ -123,11 +123,11 @@ def main(select_tpye):
         test_loss_center['avg'].append(avg_loss)
         test_acc_center['avg'].append(avg_acc)
 
-        # 中心方测试精度优于参与方时进行遗传优化
+        # 中心方测试精度优于参与方平均测试精度时进行遗传优化
         participants_now_acc = [test_acc_all[i][-1] for i in range(CLIENT_NUM)]
         if avg_acc >= sum(participants_now_acc) / CLIENT_NUM:
             gma_model, generations_acc = geneticFL(models, DEVICE, test_loader, po,
-                                                   GENERATIONS=GENERATIONS, select_type=select_tpye, pm=0.5, pc=0.8, NP=30)
+                                                   GENERATIONS=GENERATIONS, pm=0.5, pc=0.8, NP=30)
             test_acc_center['gma'].append(generations_acc[-1])
             generations_test_acc[epoch] = generations_acc
             best_model = gma_model
@@ -146,9 +146,10 @@ def main(select_tpye):
     test_acc_all.update(test_acc_center)
 
     today = datetime.date.today()
-    save_path = './%s' % today
+    save_path = os.path.join('./', str(today))
     if not os.path.isdir(save_path):
         os.makedirs(save_path)
+
     with open('./%s/GMA_train_loss_all_epoch%d.pkl' % (today, EPOCHS), 'wb') as f:
         pickle.dump(train_loss_all, f)
     with open('./%s/GMA_test_loss_all_epoch%d.pkl' % (today, EPOCHS), 'wb') as f:
@@ -165,10 +166,11 @@ def main(select_tpye):
         pickle.dump(generations_test_acc, f)
 
     # 压缩文件夹
-    select_name = '锦标赛选择' if select_tpye == 1 else '轮盘赌选择'
-    with ZipFile('%s%s.zip' % (select_name, today), 'w') as f:
+    with ZipFile('%s.zip' % today, 'w') as f:
         for file in os.listdir(save_path):
             f.write(os.path.join(save_path, file))
 
-if __name__ == '__main__':
-    main(1)
+    # select_name = '锦标赛选择' if select_tpye == 1 else '轮盘赌选择'
+    # with ZipFile('%s%s.zip' % (select_name, today), 'w') as f:
+    #     for file in os.listdir(save_path):
+    #         f.write(os.path.join(save_path, file))

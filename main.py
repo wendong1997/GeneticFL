@@ -54,8 +54,9 @@ def geneticFL(models, DEVICE, test_loader, pool, GENERATIONS, pm, pc, NP):
         # 最后一代的最优个体作为当前epoch的中心节点gma聚合结果
         if i == GENERATIONS - 1:
             gma_acc = max(fitness)
-            test_acc_center['gma'].append(gma_acc)
             gma_model = deepcopy(gma.P[fitness.index(gma_acc)])
+            generations_acc.append(gma_acc)
+            print('\nGeneration {} best model\' acc: {}'.format(i, gma_acc))
             break
 
         best_fit = gma.tournamentSelection(3, NP)
@@ -73,26 +74,24 @@ if __name__ == '__main__':
     GENERATIONS = 50
 
     # 读取分割后的数据集
-    data_path = r'./data/MNIST_data_nodes_%d.pickle' % CLIENT_NUM
+    data_path = r'./data/MNIST_data_nodes_100.pkl'
     with open(data_path, 'rb') as f:
-        client_data = pickle.load(f)
-    train_loaders = client_data['train_data']
-    # test_loader = client_data['test_data']
-    with open('./data/MNIST_onetenth_testloader.pkl', 'rb') as f:
-        test_loader = pickle.load(f)
+        all_data = pickle.load(f)
+    train_loaders = all_data['train_data']
+    test_loader = all_data['test_data']
 
     # 初始化模型和优化器
     models = [ConvNet().to(DEVICE) for _ in range(CLIENT_NUM)]
     optimizers = [optim.Adam(models[i].parameters()) for i in range(CLIENT_NUM)] # 针对model i 的优化器
-    # models[0].state_dict()
 
+    # 设置存储容器
     train_loss_all = defaultdict(list) # 所有参与方节点的训练损失
     train_acc_all = defaultdict(list) # 所有参与方节点的训练精度
     test_loss_all = defaultdict(list) # 所有参与方节点的测试损失
     test_acc_all = defaultdict(list) # 所有参与方节点的测试精度
     test_loss_center = defaultdict(list) # 中心节点测试损失，包括avg聚合、gma聚合
     test_acc_center = defaultdict(list) # 中心节点测试精度
-    generations_test_data = defaultdict(dict)
+    generations_test_acc = defaultdict(dict)
 
     # 多进程
     epoch_cost_time = []
@@ -108,12 +107,11 @@ if __name__ == '__main__':
         for i in range(CLIENT_NUM):
             test_res.append(po.apply_async(test, args=(models[i], DEVICE, test_loader, i)))
 
-        # 保存loss acc，0-9号参与节点
+        # 保存参与节点训练集和测试集的loss acc
         for i in range(len(train_res)):
             train_loss, train_acc = train_res[i].get()
             train_loss_all[i].append(train_loss)
             train_acc_all[i].append(train_acc)
-
         for i in range(len(test_res)):
             test_loss, test_acc = test_res[i].get()
             test_loss_all[i].append(test_loss)
@@ -125,52 +123,13 @@ if __name__ == '__main__':
         # test_loss_center['avg'].append(avg_loss)
         test_acc_center['avg'].append(avg_acc)
 
-        """
-        # 遗传算法优化
-        print('\n>>> GMA start ...')
-        gma = GeneticMergeAlg(models)
-        generations = defaultdict(list) # 存储每一代中最优个体的loss acc
-        for i in range(GENERATIONS):
-            print('\nGMA generation %d start \n' % i)
-            gma.mutationInLayer(0.8)
-            gma.crossover(0.8)
-            gma_model, gma_loss, gma_acc = gma.select(po, DEVICE, test_loader)
-            generations['loss'].append(gma_loss)
-            generations['acc'].append(gma_acc)
-            print('\nGeneration {} best model\' loss: {:.4f}, acc: {}'.format(i, gma_loss, gma_acc))
-            if i == GENERATIONS-1: # 最后一代的最优个体作为当前epoch的中心节点gma聚合结果
-                test_loss_center['gma'].append(gma_loss)
-                test_acc_center['gma'].append(gma_acc)
-        generations_test_data[epoch] = generations
-        """
-        # # 遗传算法优化
-        # print('\n>>> GMA start ...')
-        # gma = GeneticMergeAlg(models, DEVICE, test_loader)
-        # generations_acc = [] # 存储每一代中最优个体的acc
-        # for i in range(GENERATIONS):
-        #     print('\nGMA generation %d start \n' % i)
-        #     gma.mutationInLayer(0.5)
-        #     gma.crossover(0.8)
-        #     fitness = gma.getFitness(po)
-        #
-        #     # 最后一代的最优个体作为当前epoch的中心节点gma聚合结果
-        #     if i == GENERATIONS-1:
-        #         gma_acc = max(fitness)
-        #         test_acc_center['gma'].append(gma_acc)
-        #         gma_model = deepcopy(gma.P[fitness.index(gma_acc)])
-        #         break
-        #
-        #     best_fit = gma.tournamentSelection(3, 30)
-        #     # best_fit = gma.rouletteSeletion(30)
-        #     generations_acc.append(best_fit)
-        #     print('\nGeneration {} best model\' acc: {}'.format(i, best_fit))
-
-        # 中心方测试精度优于参与方时进行遗传优化
+        # 中心方测试精度优于参与方平均测试精度时进行遗传优化
         participants_now_acc = [test_acc_all[i][-1] for i in range(CLIENT_NUM)]
         if avg_acc >= sum(participants_now_acc) / CLIENT_NUM:
             gma_model, generations_acc = geneticFL(models, DEVICE, test_loader, po,
                                                    GENERATIONS=50, pm=0.5, pc=0.8, NP=30)
-            generations_test_data[epoch] = generations_acc
+            test_acc_center['gma'].append(generations_acc[-1])
+            generations_test_acc[epoch] = generations_acc
             best_model = gma_model
         else:
             best_model = avg_model
@@ -201,6 +160,5 @@ if __name__ == '__main__':
         pickle.dump(test_acc_center, f)
     with open('./data/result/%s/GMA_cost_time_epoch%d.pkl' % (today, EPOCHS), 'wb') as f:
         pickle.dump(epoch_cost_time, f)
-
     with open('./data/result/%s/GMA_generations_test_data_epoch%d.pkl' % (today, EPOCHS), 'wb') as f:
-        pickle.dump(generations_test_data, f)
+        pickle.dump(generations_test_acc, f)

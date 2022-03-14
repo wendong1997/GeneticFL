@@ -4,8 +4,6 @@ import torch
 from torchvision import datasets, transforms
 
 
-# 生成n个节点的数据，讲训练集的数据评分到n个节点上
-
 class Arguments():
     def __init__(self):
         self.batch_size = 64
@@ -17,39 +15,40 @@ class Arguments():
         self.seed = 1
         self.log_interval = 30
         self.save_model = False
-        self.clients = 10
+        CLIENT_NUM = 10
         self.root = './'
         self.epoch_exchange = 10
 
-
 # 设置超参数
-args = Arguments()
-torch.manual_seed(args.seed)  # cpu随机数种子
+torch.manual_seed(1)  # cpu随机数种子
+CLIENT_NUM = 100
+BATCH_SIZE = 64  # 批次大小
+TEST_BATCH_SIZE = 600
 TRANSFORM = transforms.Compose([transforms.ToTensor(),
                                 transforms.Normalize((0.1307,), (0.3081,))])
-BATCH_SIZE = 512  # 批次大小
 
-
-# 分割数据集
-train_dataset = datasets.MNIST('./data', train=True, transform=TRANSFORM, download=True)
-subset_size = int(len(train_dataset) / args.clients)
-lengths = [subset_size for _ in range(args.clients)]
-# length[-1] = int(len(train_dataset) - (args.clients - 1) * subset_size)
+# 分割训练集
+train_dataset = datasets.MNIST('./', train=True, transform=TRANSFORM, download=True)
+subset_size = int(len(train_dataset) / CLIENT_NUM)
+lengths = [subset_size for _ in range(CLIENT_NUM)]
 data_split = torch.utils.data.random_split(dataset=train_dataset, lengths=lengths)
-
 train_loader_list = []
-for i in range(args.clients):
-    train_loader = torch.utils.data.DataLoader(data_split[i], batch_size=args.batch_size, shuffle=True)
+for i in range(CLIENT_NUM):
+    train_loader = torch.utils.data.DataLoader(data_split[i], batch_size=BATCH_SIZE, shuffle=True)
     train_loader_list.append(train_loader)
 
-test_dataset = datasets.MNIST('./data', train=False, transform=TRANSFORM, download=True)
-test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=args.test_batch_size, shuffle=False)
+# 分割测试集
+test_dataset = datasets.MNIST('./', train=False, transform=TRANSFORM, download=True)
+lengths = [600, 9400] # 选取600张图片作为测试集
+data_split = torch.utils.data.random_split(dataset=test_dataset, lengths=lengths)
+test_loader = torch.utils.data.DataLoader(data_split[0], batch_size=TEST_BATCH_SIZE, shuffle=False)
+# test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=TEST_BATCH_SIZE, shuffle=False)
 
-savetarget = {
+# 保存
+save_data = {
     "train_data": train_loader_list,
     "test_data": test_loader
 }
-
-filedirname = r'./data/MNIST_data_nodes_%d.pickle' % args.clients
+filedirname = './MNIST_data_nodes_%d.pkl' % CLIENT_NUM
 with open(filedirname, 'wb') as f:
-    pickle.dump(savetarget, f)
+    pickle.dump(save_data, f)
