@@ -89,6 +89,7 @@ if __name__ == '__main__':
 
     # 设置存储容器
     train_loss_all = defaultdict(list) # 所有参与方节点的训练损失
+    train_acc_all = defaultdict(list) # 所有参与方节点的训练精度
     test_loss_all = defaultdict(list) # 所有参与方节点的测试损失
     test_acc_all = defaultdict(list) # 所有参与方节点的测试精度
     test_loss_center = defaultdict(list) # 中心节点测试损失，包括avg聚合、gma聚合
@@ -109,18 +110,20 @@ if __name__ == '__main__':
         for i in range(CLIENT_NUM):
             test_res.append(po.apply_async(test, args=(models[i], DEVICE, test_loader, i)))
 
-        # 保存loss acc，0-9号参与节点
+        # 保存参与节点训练集和测试集的loss acc
         for i in range(len(train_res)):
-            train_loss_all[i].append(train_res[i].get())
+            train_loss, train_acc = train_res[i].get()
+            train_loss_all[i].append(train_loss)
+            train_acc_all[i].append(train_acc)
         for i in range(len(test_res)):
-            loss, acc = test_res[i].get()
-            test_loss_all[i].append(loss)
-            test_acc_all[i].append(acc)
+            test_loss, test_acc = test_res[i].get()
+            test_loss_all[i].append(test_loss)
+            test_acc_all[i].append(test_acc)
 
         # 联邦聚合，聚合后测试
         avg_model = getAverageModel(models)
         avg_loss, avg_acc = test(avg_model, DEVICE, test_loader, 'avg')
-        test_loss_center['avg'].append(avg_loss)
+        # test_loss_center['avg'].append(avg_loss)
         test_acc_center['avg'].append(avg_acc)
 
         # 中心方测试精度优于参与方平均测试精度时进行遗传优化
@@ -152,6 +155,8 @@ if __name__ == '__main__':
 
     with open('./%s/GMA_train_loss_all_epoch%d.pkl' % (today, EPOCHS), 'wb') as f:
         pickle.dump(train_loss_all, f)
+    with open('./%s/GMA_train_acc_all_epoch%d.pkl' % (today, EPOCHS), 'wb') as f:
+        pickle.dump(train_acc_all, f)
     with open('./%s/GMA_test_loss_all_epoch%d.pkl' % (today, EPOCHS), 'wb') as f:
         pickle.dump(test_loss_all, f)
     with open('./%s/GMA_test_acc_all_epoch%d.pkl' % (today, EPOCHS), 'wb') as f:
@@ -162,7 +167,7 @@ if __name__ == '__main__':
         pickle.dump(test_acc_center, f)
     with open('./%s/GMA_cost_time_epoch%d.pkl' % (today, EPOCHS), 'wb') as f:
         pickle.dump(epoch_cost_time, f)
-    with open('./%s/GMA_generations_test_data_epoch%d.pkl' % (today, EPOCHS), 'wb') as f:
+    with open('./%s/GMA_generations_test_acc_epoch%d.pkl' % (today, EPOCHS), 'wb') as f:
         pickle.dump(generations_test_acc, f)
 
     # 压缩文件夹

@@ -127,7 +127,7 @@ if __name__ == '__main__':
         participants_now_acc = [test_acc_all[i][-1] for i in range(CLIENT_NUM)]
         if avg_acc >= sum(participants_now_acc) / CLIENT_NUM:
             gma_model, generations_acc = geneticFL(models, DEVICE, test_loader, po,
-                                                   GENERATIONS=50, pm=0.5, pc=0.8, NP=30)
+                                                   GENERATIONS=GENERATIONS, pm=0.5, pc=0.8, NP=30)
             test_acc_center['gma'].append(generations_acc[-1])
             generations_test_acc[epoch] = generations_acc
             best_model = gma_model

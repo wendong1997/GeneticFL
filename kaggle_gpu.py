@@ -74,13 +74,13 @@ def main(select_tpye):
     GENERATIONS = 50
 
     # 读取分割后的数据集
-    data_path = r'./data/MNIST_data_nodes_%d.pickle' % CLIENT_NUM
+    data_path = r'./data/MNIST_data_nodes_100.pkl'
     with open(data_path, 'rb') as f:
-        client_data = pickle.load(f)
-    train_loaders = client_data['train_data']
-    # test_loader = client_data['test_data']
-    with open('./data/MNIST_onetenth_testloader.pkl', 'rb') as f:
-        test_loader = pickle.load(f)
+        all_data = pickle.load(f)
+    train_loaders = all_data['train_data']
+    test_loader = all_data['test_data']
+    # with open('./data/MNIST_onetenth_testloader.pkl', 'rb') as f:
+    #     test_loader = pickle.load(f)
 
     # 初始化模型和优化器
     models = [ConvNet().to(DEVICE) for _ in range(CLIENT_NUM)]
@@ -117,7 +117,7 @@ def main(select_tpye):
         participants_now_acc = [test_acc_all[i][-1] for i in range(CLIENT_NUM)]
         if avg_acc >= sum(participants_now_acc) / CLIENT_NUM:
             gma_model, generations_acc = geneticFL(models, DEVICE, test_loader,
-                                                   GENERATIONS=50, select_type=select_tpye, pm=0.5, pc=0.8, NP=30)
+                                                   GENERATIONS=GENERATIONS, select_type=select_tpye, pm=0.5, pc=0.8, NP=30)
             test_acc_center['gma'].append(generations_acc[-1])
             generations_test_acc[epoch] = generations_acc
             best_model = gma_model
