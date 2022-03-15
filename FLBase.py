@@ -51,9 +51,9 @@ if __name__ == '__main__':
 
     # 初始化模型和优化器
     models = [ConvNet().to(DEVICE) for _ in range(CLIENT_NUM)]
-    # first_param = torch.load('./data/ModelParam.pth')
-    # for i in range(len(models)):
-    #     models[i].load_state_dict(first_param)
+    first_param = torch.load('./data/ModelParam.pth')
+    for i in range(len(models)):
+        models[i].load_state_dict(first_param)
     optimizers = [optim.Adam(models[i].parameters()) for i in range(CLIENT_NUM)]
 
     # 设置存储容器
