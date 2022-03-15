@@ -68,6 +68,7 @@ def geneticFL(models, DEVICE, test_loader, pool, GENERATIONS, pm, pc, NP):
     return gma_model, generations_acc
 
 if __name__ == '__main__':
+    torch.multiprocessing.set_start_method('spawn')
     # 设置超参数
     CLIENT_NUM = 10
     EPOCHS = 2  # 总共训练批次
@@ -84,8 +85,11 @@ if __name__ == '__main__':
     #     test_loader = pickle.load(f)
 
     # 初始化模型和优化器
+    first_param = torch.load('./data/ModelParam.pth')
     models = [ConvNet().to(DEVICE) for _ in range(CLIENT_NUM)]
-    optimizers = [optim.Adam(models[i].parameters()) for i in range(CLIENT_NUM)] # 针对model i 的优化器
+    for i in range(len(models)):
+        models[i].load_state_dict(first_param)
+    optimizers = [optim.Adam(models[i].parameters()) for i in range(CLIENT_NUM)]
 
     # 设置存储容器
     train_loss_all = defaultdict(list) # 所有参与方节点的训练损失
