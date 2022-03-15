@@ -115,6 +115,6 @@ if __name__ == '__main__':
         pickle.dump(epoch_cost_time, f)
 
     # 压缩文件夹
-    with ZipFile('FL.zip', 'w') as f:
+    with ZipFile('distributed.zip', 'w') as f:
         for file in os.listdir(save_path):
             f.write(os.path.join(save_path, file))
