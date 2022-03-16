@@ -4,6 +4,7 @@ import pickle
 from scipy.ndimage import gaussian_filter1d
 
 with open('./FL10nodes/FL_test_acc_all_epoch100.pkl', 'rb') as f:
+# with open('./FL10nodes/FL_train_acc_all_epoch100.pkl', 'rb') as f:
     y_data = pickle.load(f)
     y_avg = y_data['avg']
 
@@ -15,7 +16,7 @@ plt.xlabel('round', fontsize=12)
 plt.ylabel('acc', fontsize=12)
 plt.title('Test Accuracy')
 
-plt.plot(x_data, y_avg, label='FedAvg', linewidth=2)
+plt.plot(x_data, gaussian_filter1d(y_avg, sigma=1), label='FedAvg', linewidth=2)
 for i in range(10):
     plt.plot(x_data, gaussian_filter1d(y_data[i], sigma=1), label='Node {}'.format(i))
 

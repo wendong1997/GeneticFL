@@ -81,6 +81,7 @@ if __name__ == '__main__':
         all_data = pickle.load(f)
     train_loaders = all_data['train_data']
     test_loader = all_data['test_data']
+    val_loader = all_data['val_data']
     # with open('./data/MNIST_onetenth_testloader.pkl', 'rb') as f:
     #     test_loader = pickle.load(f)
 
@@ -99,6 +100,9 @@ if __name__ == '__main__':
     test_loss_center = defaultdict(list) # 中心节点测试损失，包括avg聚合、gma聚合
     test_acc_center = defaultdict(list) # 中心节点测试精度
     generations_test_acc = defaultdict(dict)
+
+    val_acc_center = [] # 中心节点的验证损失
+
 
     # 多进程
     epoch_cost_time = []
@@ -140,6 +144,17 @@ if __name__ == '__main__':
             best_model = gma_model
         else:
             best_model = avg_model
+
+        # 验证中心方模型
+        val_loss, val_acc = test(best_model, DEVICE, val_loader, 'gma')
+        val_acc_center.append(val_acc)
+
+        # 保存最优模型
+        save_dir = './ModelParam'
+        if not os.path.isdir(save_dir):
+            os.makedirs(save_dir)
+        save_path = os.path.join(save_dir, 'epoch{}.pth'.format(epoch))
+        torch.save(best_model.state_dict(), save_path)
         updataModels(models, best_model) # 将最优的模型参数赋值为models
 
         cost_time = datetime.datetime.now() - start_time
@@ -173,6 +188,9 @@ if __name__ == '__main__':
         pickle.dump(epoch_cost_time, f)
     with open('./%s/GMA_generations_test_acc_epoch%d.pkl' % (today, EPOCHS), 'wb') as f:
         pickle.dump(generations_test_acc, f)
+
+    with open('./%s/GMA_val_acc_center_epoch%d.pkl' % (today, EPOCHS), 'wb') as f:
+        pickle.dump(val_acc_center, f)
 
     # 压缩文件夹
     with ZipFile('%s.zip' % today, 'w') as f:

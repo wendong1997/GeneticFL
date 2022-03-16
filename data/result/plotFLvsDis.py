@@ -24,10 +24,10 @@ for node in range(4):
 
     plt.xlabel('round', fontsize=10)
     plt.ylabel('acc', fontsize=10)
-    plt.title('Node {} Test Accuracy'.format(node), fontsize=10)
+    plt.title('Node {} Train Accuracy'.format(node), fontsize=10)
 
-    plt.plot(x_data, gaussian_filter1d(y_fl[node], sigma=1), label='FL')
-    plt.plot(x_data, gaussian_filter1d(y_dis[node], sigma=1), label='NonFL')
+    plt.plot(x_data, gaussian_filter1d(y_fl[node], sigma=1), label='FL', color='#1f77b4')
+    plt.plot(x_data, gaussian_filter1d(y_dis[node], sigma=1), label='NonFL', color='#ff7f0e')
 
     plt.legend()
 

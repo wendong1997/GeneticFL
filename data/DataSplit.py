@@ -39,15 +39,17 @@ for i in range(CLIENT_NUM):
 
 # 分割测试集
 test_dataset = datasets.MNIST('./', train=False, transform=TRANSFORM, download=True)
-lengths = [600, 9400] # 选取600张图片作为测试集
+lengths = [600, 600, 8800] # 选取600张图片作为测试集, 600张作为验证集
 data_split = torch.utils.data.random_split(dataset=test_dataset, lengths=lengths)
 test_loader = torch.utils.data.DataLoader(data_split[0], batch_size=TEST_BATCH_SIZE, shuffle=False)
+val_loader = torch.utils.data.DataLoader(data_split[1], batch_size=TEST_BATCH_SIZE, shuffle=False)
 # test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=TEST_BATCH_SIZE, shuffle=False)
 
 # 保存
 save_data = {
     "train_data": train_loader_list,
-    "test_data": test_loader
+    "test_data": test_loader,
+    "val_data": val_loader
 }
 filedirname = './MNIST_data_nodes_%d.pkl' % CLIENT_NUM
 with open(filedirname, 'wb') as f:
