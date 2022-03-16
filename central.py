@@ -30,21 +30,20 @@ if __name__ == '__main__':
     train_loaders = all_data['train_data']
     test_loader = all_data['test_data']
 
-    # 使用分割后前10各节点的训练数据集
-    train_dataset = train_loaders[0].dataset
-    for i in range(1, 10):
-        train_dataset += train_loaders[i].dataset
-    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
-
-    # # 读取全部训练集与分割后的1000张测试集
-    # train_dataset = datasets.MNIST('./data', train=True, transform=TRANSFORM, download=True)
+    # # 使用分割后前10各节点的训练数据集
+    # train_dataset = train_loaders[0].dataset
+    # for i in range(1, 10):
+    #     train_dataset += train_loaders[i].dataset
     # train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
+
+    # 读取全部训练集与分割后的1000张测试集
+    train_dataset = datasets.MNIST('./data', train=True, transform=TRANSFORM, download=True)
+    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
     # with open('./data/MNIST_onetenth_testloader.pkl', 'rb') as f:
     #     test_loader = pickle.load(f)
 
 
     # 初始化模型和优化器
-
     model = ConvNet().to(DEVICE)
     first_param = torch.load('./data/ModelParam.pth')
     model.load_state_dict(first_param)
@@ -60,9 +59,9 @@ if __name__ == '__main__':
         train_acc_central.append(train_acc)
         test_acc_central.append(test_acc)
 
-    with open('data/result/Central10nodes/train_acc_epoch100.pkl', 'wb') as f:
+    with open('data/result/Central100nodes/train_acc_epoch100.pkl', 'wb') as f:
         pickle.dump(train_acc_central, f)
-    with open('data/result/Central10nodes/test_acc_epoch100.pkl', 'wb') as f:
+    with open('data/result/Central100nodes/test_acc_epoch100.pkl', 'wb') as f:
         pickle.dump(test_acc_central, f)
 
 
