@@ -39,7 +39,7 @@ def aggregate(params):
 if __name__ == '__main__':
     torch.multiprocessing.set_start_method('spawn')
     # 设置超参数
-    CLIENT_NUM = 100
+    CLIENT_NUM = 10
     EPOCHS = 100  # 总共训练批次
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -49,6 +49,7 @@ if __name__ == '__main__':
         all_data = pickle.load(f)
     train_loaders = all_data['train_data']
     test_loader = all_data['test_data']
+    val_loader = all_data['val_data']
 
     # 初始化模型和优化器
     models = [ConvNet().to(DEVICE) for _ in range(CLIENT_NUM)]
@@ -64,6 +65,7 @@ if __name__ == '__main__':
     test_acc_all = defaultdict(list) # 所有参与方节点的测试精度
     test_loss_avg = [] # 中心节点测试损失
     test_acc_avg = [] # 中心节点测试精度
+    val_acc_avg = []
 
     """
     # 单进程
@@ -121,6 +123,21 @@ if __name__ == '__main__':
         test_loss_avg.append(loss)
         test_acc_avg.append(acc)
 
+        # 验证
+        val_loss, val_acc = test(models[0], DEVICE, val_loader, 'avg')
+        val_acc_avg.append(val_acc)
+
+        # 保存最优模型
+        save_dir = './FedAvgModelParams'
+        if not os.path.isdir(save_dir):
+            os.makedirs(save_dir)
+        save_path = os.path.join(save_dir, 'epoch{}.pth'.format(epoch))
+        torch.save(models[0].state_dict(), save_path)
+        if epoch == EPOCHS:
+            with ZipFile('FedAvgModelParams.zip', 'w') as f: # 压缩文件夹
+                for file in os.listdir(save_path):
+                    f.write(os.path.join(save_path, file))
+
         # 打印耗时
         cost_time = datetime.datetime.now() - start_time
         epoch_cost_time.append(cost_time)
@@ -151,6 +168,9 @@ if __name__ == '__main__':
         pickle.dump(test_acc_avg, f)
     with open('./FL/FL_cost_time_epoch%d.pkl' % EPOCHS, 'wb') as f:
         pickle.dump(epoch_cost_time, f)
+
+    with open('./FL/FL_val_acc_avg_epoch%d.pkl' % EPOCHS, 'wb') as f:
+        pickle.dump(val_acc_avg, f)
 
     # 压缩文件夹
     with ZipFile('FL.zip', 'w') as f:
