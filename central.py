@@ -17,7 +17,7 @@ from GMA import GeneticMergeAlg
 
 if __name__ == '__main__':
     # 设置超参数
-    EPOCHS = 100  # 总共训练批次
+    EPOCHS = 2  # 总共训练批次
     BATCH_SIZE = 64
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     TRANSFORM = transforms.Compose([transforms.ToTensor(),
@@ -59,9 +59,18 @@ if __name__ == '__main__':
         train_acc_central.append(train_acc)
         test_acc_central.append(test_acc)
 
-    with open('data/result/Central100nodes/train_acc_epoch100.pkl', 'wb') as f:
+    # 持久化存储
+    save_path = './Central100nodes'
+    if not os.path.isdir(save_path):
+        os.makedirs(save_path)
+
+    with open('Central100nodes/train_acc_epoch100.pkl', 'wb') as f:
         pickle.dump(train_acc_central, f)
-    with open('data/result/Central100nodes/test_acc_epoch100.pkl', 'wb') as f:
+    with open('Central100nodes/test_acc_epoch100.pkl', 'wb') as f:
         pickle.dump(test_acc_central, f)
 
+    # 压缩文件夹
+    with ZipFile('Central100nodes.zip', 'w') as f:
+        for file in os.listdir(save_path):
+            f.write(os.path.join(save_path, file))
 
