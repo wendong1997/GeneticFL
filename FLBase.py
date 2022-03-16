@@ -135,8 +135,8 @@ if __name__ == '__main__':
         torch.save(models[0].state_dict(), save_path)
         if epoch == EPOCHS:
             with ZipFile('FedAvgModelParams.zip', 'w') as f: # 压缩文件夹
-                for file in os.listdir(save_path):
-                    f.write(os.path.join(save_path, file))
+                for file in os.listdir(save_dir):
+                    f.write(os.path.join(save_dir, file))
 
         # 打印耗时
         cost_time = datetime.datetime.now() - start_time
