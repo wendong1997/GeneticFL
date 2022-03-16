@@ -3,7 +3,7 @@ import pickle
 
 from scipy.ndimage import gaussian_filter1d
 
-with open('./distributed100/FL_test_acc_all_epoch100.pkl', 'rb') as f:
+with open('./distributed10nodes/FL_test_acc_all_epoch100.pkl', 'rb') as f:
     y_data = pickle.load(f)
 
 x_data = [i + 1 for i in range(100)]

@@ -10,9 +10,9 @@ from scipy.ndimage import gaussian_filter1d
 #     y_fl = pickle.load(f)
 
 # 训练精度
-with open('./distributed100/FL_train_acc_all_epoch100.pkl', 'rb') as f:
+with open('./distributed10nodes/FL_train_acc_all_epoch100.pkl', 'rb') as f:
     y_dis = pickle.load(f)
-with open('./FL100/FL_train_acc_all_epoch100.pkl', 'rb') as f:
+with open('./FL10nodes/FL_train_acc_all_epoch100.pkl', 'rb') as f:
     y_fl = pickle.load(f)
 
 plt.figure() # 创建画布

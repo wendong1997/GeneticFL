@@ -70,7 +70,7 @@ def geneticFL(models, DEVICE, test_loader, pool, GENERATIONS, pm, pc, NP):
 if __name__ == '__main__':
     torch.multiprocessing.set_start_method('spawn')
     # 设置超参数
-    CLIENT_NUM = 10
+    CLIENT_NUM = 100
     EPOCHS = 100  # 总共训练批次
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     GENERATIONS = 10

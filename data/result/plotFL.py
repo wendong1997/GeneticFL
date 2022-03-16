@@ -3,7 +3,7 @@ import pickle
 
 from scipy.ndimage import gaussian_filter1d
 
-with open('./FL100/FL_test_acc_all_epoch100.pkl', 'rb') as f:
+with open('./FL10nodes/FL_test_acc_all_epoch100.pkl', 'rb') as f:
     y_data = pickle.load(f)
     y_avg = y_data['avg']
 
