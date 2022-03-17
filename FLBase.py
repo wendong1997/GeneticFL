@@ -65,7 +65,7 @@ if __name__ == '__main__':
     test_acc_all = defaultdict(list) # 所有参与方节点的测试精度
     test_loss_avg = [] # 中心节点测试损失
     test_acc_avg = [] # 中心节点测试精度
-    val_acc_avg = []
+    val_acc_avg = [] # 中心节点验证精度
 
     """
     # 单进程

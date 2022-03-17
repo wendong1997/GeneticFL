@@ -29,18 +29,19 @@ if __name__ == '__main__':
         all_data = pickle.load(f)
     train_loaders = all_data['train_data']
     test_loader = all_data['test_data']
+    val_loader = all_data['val_data']
 
-    # # 使用分割后前10各节点的训练数据集
-    # train_dataset = train_loaders[0].dataset
-    # for i in range(1, 10):
-    #     train_dataset += train_loaders[i].dataset
-    # train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
-
-    # 读取全部训练集与分割后的1000张测试集
-    train_dataset = datasets.MNIST('./data', train=True, transform=TRANSFORM, download=True)
+    # 使用分割后前10各节点的训练数据集
+    train_dataset = train_loaders[0].dataset
+    for i in range(1, 10):
+        train_dataset += train_loaders[i].dataset
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
-    # with open('./data/MNIST_onetenth_testloader.pkl', 'rb') as f:
-    #     test_loader = pickle.load(f)
+
+    # # 读取全部训练集与分割后的1000张测试集
+    # train_dataset = datasets.MNIST('./data', train=True, transform=TRANSFORM, download=True)
+    # train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
+    # # with open('./data/MNIST_onetenth_testloader.pkl', 'rb') as f:
+    # #     test_loader = pickle.load(f)
 
 
     # 初始化模型和优化器
@@ -52,25 +53,30 @@ if __name__ == '__main__':
     # 设置存储容器
     train_acc_central = []
     test_acc_central = []
+    val_acc_central = []
 
     for epoch in range(1, EPOCHS + 1):
         _, train_acc = train(model, DEVICE, train_loader, optimizer, epoch, 'center')
         _, test_acc = test(model, DEVICE, test_loader)
+        _, val_acc = test(model, DEVICE, val_loader)
         train_acc_central.append(train_acc)
         test_acc_central.append(test_acc)
+        val_acc_central.append(test_acc)
 
     # 持久化存储
-    save_path = './Central100nodes'
+    save_path = './Central10nodes'
     if not os.path.isdir(save_path):
         os.makedirs(save_path)
 
-    with open('Central100nodes/train_acc_epoch100.pkl', 'wb') as f:
+    with open('Central10nodes/train_acc_epoch100.pkl', 'wb') as f:
         pickle.dump(train_acc_central, f)
-    with open('Central100nodes/test_acc_epoch100.pkl', 'wb') as f:
+    with open('Central10nodes/test_acc_epoch100.pkl', 'wb') as f:
         pickle.dump(test_acc_central, f)
+    with open('Central10nodes/val_acc_epoch100.pkl', 'wb') as f:
+        pickle.dump(val_acc_central, f)
 
     # 压缩文件夹
-    with ZipFile('Central100nodes.zip', 'w') as f:
+    with ZipFile('Central10nodes.zip', 'w') as f:
         for file in os.listdir(save_path):
             f.write(os.path.join(save_path, file))
 
