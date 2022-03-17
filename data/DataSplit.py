@@ -39,7 +39,7 @@ for i in range(CLIENT_NUM):
 
 # 分割测试集
 test_dataset = datasets.MNIST('./', train=False, transform=TRANSFORM, download=True)
-lengths = [600, 600, 8800] # 选取600张图片作为测试集, 600张作为验证集
+lengths = [1200, 600, 8200] # 选取600张图片作为测试集, 600张作为验证集
 data_split = torch.utils.data.random_split(dataset=test_dataset, lengths=lengths)
 test_loader = torch.utils.data.DataLoader(data_split[0], batch_size=TEST_BATCH_SIZE, shuffle=False)
 val_loader = torch.utils.data.DataLoader(data_split[1], batch_size=TEST_BATCH_SIZE, shuffle=False)
