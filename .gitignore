@@ -1,4 +1,5 @@
 /data/result/
+/data/result/old
 /data/MNIST/
 /used
 test.py
