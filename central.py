@@ -32,11 +32,12 @@ if __name__ == '__main__':
     val_loader = all_data['val_data']
 
     # 使用分割后前10各节点的训练数据集
-    train_dataset = train_loaders[0].dataset
-    for i in range(1, 10):
-        train_dataset += train_loaders[i].dataset
+    train_datasets = [train_loaders[i].dataset for i in range(10)]
+    train_dataset = torch.utils.data.ConcatDataset(train_datasets) # 合并数据集
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
-
+    # train_dataset = train_loaders[0].dataset
+    # for i in range(1, 10):
+    #     train_dataset += train_loaders[i].dataset
     # # 读取全部训练集与分割后的1000张测试集
     # train_dataset = datasets.MNIST('./data', train=True, transform=TRANSFORM, download=True)
     # train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)

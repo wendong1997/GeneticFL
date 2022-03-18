@@ -23,7 +23,8 @@ class Arguments():
 torch.manual_seed(1)  # cpu随机数种子
 CLIENT_NUM = 100
 BATCH_SIZE = 64  # 批次大小
-TEST_BATCH_SIZE = 600
+TEST_BATCH_SIZE = 1200
+VAL_BATCH_SIZE = 600
 TRANSFORM = transforms.Compose([transforms.ToTensor(),
                                 transforms.Normalize((0.1307,), (0.3081,))])
 
@@ -42,7 +43,7 @@ test_dataset = datasets.MNIST('./', train=False, transform=TRANSFORM, download=T
 lengths = [1200, 600, 8200] # 选取600张图片作为测试集, 600张作为验证集
 data_split = torch.utils.data.random_split(dataset=test_dataset, lengths=lengths)
 test_loader = torch.utils.data.DataLoader(data_split[0], batch_size=TEST_BATCH_SIZE, shuffle=False)
-val_loader = torch.utils.data.DataLoader(data_split[1], batch_size=TEST_BATCH_SIZE, shuffle=False)
+val_loader = torch.utils.data.DataLoader(data_split[1], batch_size=VAL_BATCH_SIZE, shuffle=False)
 # test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=TEST_BATCH_SIZE, shuffle=False)
 
 # 保存
