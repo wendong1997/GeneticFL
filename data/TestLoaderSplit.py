@@ -18,7 +18,7 @@ data = {
     'val_data':val_loader
 }
 with open('./MNIST_test_val_loader.pkl', 'wb') as f:
-    pickle.dump(test_loader, f)
+    pickle.dump(data, f)
 
 # test_dataset = datasets.MNIST('../data', train=False, transform=TRANSFORM, download=True)
 # onetenth_size = int(len(test_dataset) / 10)
