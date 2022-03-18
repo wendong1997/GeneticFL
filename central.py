@@ -62,7 +62,7 @@ if __name__ == '__main__':
         _, val_acc = test(model, DEVICE, val_loader)
         train_acc_central.append(train_acc)
         test_acc_central.append(test_acc)
-        val_acc_central.append(test_acc)
+        val_acc_central.append(val_acc)
 
     # 持久化存储
     save_path = './Central10nodes'
