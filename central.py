@@ -28,11 +28,15 @@ if __name__ == '__main__':
     with open(data_path, 'rb') as f:
         all_data = pickle.load(f)
     train_loaders = all_data['train_data']
-    test_loader = all_data['test_data']
-    val_loader = all_data['val_data']
+    # test_loader = all_data['test_data']
+    # val_loader = all_data['val_data']
+    with open('./data/MNIST_test_val_loader.pkl', 'rb') as f:
+        data = pickle.load(f)
+    test_loader = data['test_data']
+    val_loader = data['val_data']
 
     # 使用分割后前10各节点的训练数据集
-    train_datasets = [train_loaders[i].dataset for i in range(10)]
+    train_datasets = [train_loaders[i].dataset for i in range(100)]
     train_dataset = torch.utils.data.ConcatDataset(train_datasets) # 合并数据集
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
     # train_dataset = train_loaders[0].dataset

@@ -39,7 +39,7 @@ def aggregate(params):
 if __name__ == '__main__':
     torch.multiprocessing.set_start_method('spawn')
     # 设置超参数
-    CLIENT_NUM = 10
+    CLIENT_NUM = 100
     EPOCHS = 100  # 总共训练批次
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -48,8 +48,12 @@ if __name__ == '__main__':
     with open(data_path, 'rb') as f:
         all_data = pickle.load(f)
     train_loaders = all_data['train_data']
-    test_loader = all_data['test_data']
-    val_loader = all_data['val_data']
+    # test_loader = all_data['test_data']
+    # val_loader = all_data['val_data']
+    with open('./data/MNIST_test_val_loader.pkl', 'rb') as f:
+        data = pickle.load(f)
+    test_loader = data['test_data']
+    val_loader = data['val_data']
 
     # 初始化模型和优化器
     models = [ConvNet().to(DEVICE) for _ in range(CLIENT_NUM)]
